@@ -156,5 +156,16 @@ const ChatView: React.FC = () => {
     </div>
   );
 };
+async function sendToGemini(text: string) {
+  const res = await fetch("/api/gemini", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ prompt: text })
+  });
 
+  const data = await res.json();
+  console.log(data);
+}
 export default ChatView;
