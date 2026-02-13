@@ -27,10 +27,16 @@ export interface VideoResult {
 }
 
 declare global {
-  /* Fix: Use the AIStudio type for the aistudio property to match the environment's 
-     Window interface declaration and fix modifier/type mismatch errors. */
+  // Move AIStudio to the global namespace to allow merging with environment-provided types and avoid module-scoping conflicts.
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
   interface Window {
-    aistudio: AIStudio;
+    // webkitAudioContext is retained for compatibility.
+    // The explicit aistudio property is removed here to avoid "identical modifiers" and "subsequent property declaration" errors, 
+    // as it is already declared in the environment's global scope.
     webkitAudioContext: typeof AudioContext;
   }
 }
