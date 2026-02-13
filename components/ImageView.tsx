@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { ImageResult } from '../types';
+import { ImageResult } from '../types.ts';
 
 const ImageView: React.FC = () => {
   const [prompt, setPrompt] = useState('');
@@ -14,7 +14,6 @@ const ImageView: React.FC = () => {
 
     setIsGenerating(true);
     try {
-      // Fix: Always use process.env.API_KEY directly for initialization as per @google/genai guidelines.
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
@@ -39,11 +38,11 @@ const ImageView: React.FC = () => {
       }
 
       if (!foundImage) {
-        alert("Model didn't return an image part.");
+        alert("The model didn't return an image. Please try a different prompt.");
       }
     } catch (error) {
-      console.error('Image gen error:', error);
-      alert("Error generating image.");
+      console.error('Image generation error:', error);
+      alert("Error generating image. This may be due to an API error or content safety filters.");
     } finally {
       setIsGenerating(false);
     }
@@ -51,7 +50,6 @@ const ImageView: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full overflow-hidden">
-      {/* Controls */}
       <div className="lg:col-span-1 glass rounded-3xl p-6 space-y-8 flex flex-col h-full overflow-y-auto">
         <div>
           <h2 className="text-xl font-bold mb-2">Image Studio</h2>
@@ -77,7 +75,7 @@ const ImageView: React.FC = () => {
                 onClick={() => setAspectRatio(ratio)}
                 className={`py-2 px-3 rounded-xl text-xs font-medium border transition-all ${
                   aspectRatio === ratio
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
                     : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'
                 }`}
               >
@@ -108,7 +106,6 @@ const ImageView: React.FC = () => {
         </button>
       </div>
 
-      {/* Results */}
       <div className="lg:col-span-2 space-y-6 overflow-y-auto pr-2">
         {results.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-12 glass rounded-3xl border-dashed border-2 border-white/10">
@@ -123,7 +120,7 @@ const ImageView: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {results.map((res, idx) => (
-              <div key={idx} className="glass rounded-3xl overflow-hidden group">
+              <div key={idx} className="glass rounded-3xl overflow-hidden group border border-white/5">
                 <div className="relative aspect-square">
                   <img src={res.url} alt={res.prompt} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-6 text-center">

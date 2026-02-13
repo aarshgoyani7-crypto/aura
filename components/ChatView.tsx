@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
-import { ChatMessage } from '../types';
+import { ChatMessage } from '../types.ts';
 
 const ChatView: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -30,7 +30,6 @@ const ChatView: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Fix: Always use process.env.API_KEY directly for initialization as per @google/genai guidelines.
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const chat = ai.chats.create({
         model: 'gemini-3-flash-preview',
@@ -60,11 +59,11 @@ const ChatView: React.FC = () => {
       }
 
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error('Chat error detail:', error);
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: 'Sorry, I encountered an error processing your request.',
+        text: 'I encountered an error. This might be due to an invalid API key or a network issue. Please check your connection and try again.',
         timestamp: new Date()
       }]);
     } finally {
@@ -90,8 +89,8 @@ const ChatView: React.FC = () => {
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[80%] rounded-2xl px-5 py-3 ${
               msg.role === 'user' 
-                ? 'bg-indigo-600 text-white' 
-                : 'bg-white/10 text-gray-200 border border-white/5'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' 
+                : 'bg-white/10 text-gray-200 border border-white/5 backdrop-blur-sm'
             }`}>
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</p>
               <span className="text-[10px] opacity-50 mt-2 block">
