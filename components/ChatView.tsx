@@ -18,6 +18,18 @@ const ChatView: React.FC = () => {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
+    // Safety check for API key before starting
+    const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) || '';
+    if (!apiKey) {
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'model',
+        text: 'Error: API Key is missing in the environment. Please ensure the project is configured correctly.',
+        timestamp: new Date()
+      }]);
+      return;
+    }
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -26,19 +38,20 @@ const ChatView: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = input;
     setInput('');
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       const chat = ai.chats.create({
         model: 'gemini-3-flash-preview',
         config: {
-          systemInstruction: 'You are a helpful, creative, and professional AI assistant in Aura Studio. Keep responses concise but highly informative.',
+          systemInstruction: 'You are Aura, a world-class AI assistant. You are creative, technical, and precise. Provide helpful and detailed responses.',
         },
       });
 
-      const responseStream = await chat.sendMessageStream({ message: input });
+      const responseStream = await chat.sendMessageStream({ message: currentInput });
       
       let aiMessageId = (Date.now() + 1).toString();
       let fullAiResponse = '';
@@ -50,7 +63,9 @@ const ChatView: React.FC = () => {
         timestamp: new Date()
       }]);
 
+      let hasReceivedChunk = false;
       for await (const chunk of responseStream) {
+        hasReceivedChunk = true;
         const c = chunk as GenerateContentResponse;
         fullAiResponse += c.text || '';
         setMessages(prev => prev.map(msg => 
@@ -58,12 +73,17 @@ const ChatView: React.FC = () => {
         ));
       }
 
-    } catch (error) {
-      console.error('Chat error detail:', error);
+      if (!hasReceivedChunk) {
+        throw new Error('Received empty response stream from the model.');
+      }
+
+    } catch (error: any) {
+      console.error('Chat error:', error);
+      const errorMessage = error?.message || 'Unknown API Error';
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: 'I encountered an error. This might be due to an invalid API key or a network issue. Please check your connection and try again.',
+        text: `Error: ${errorMessage}. Please check the console for details.`,
         timestamp: new Date()
       }]);
     } finally {
@@ -81,25 +101,25 @@ const ChatView: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-white">How can I help you today?</h2>
-            <p className="text-gray-400 max-w-sm">Start a conversation to explore ideas, get help with code, or just chat.</p>
+            <h2 className="text-xl font-semibold text-white">Welcome to Aura Studio</h2>
+            <p className="text-gray-400 max-w-sm">Type a message below to start an intelligent conversation with Gemini 3.</p>
           </div>
         )}
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-2xl px-5 py-3 ${
+            <div className={`max-w-[85%] rounded-2xl px-5 py-3 ${
               msg.role === 'user' 
                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' 
-                : 'bg-white/10 text-gray-200 border border-white/5 backdrop-blur-sm'
+                : 'bg-white/10 text-gray-200 border border-white/5 backdrop-blur-md'
             }`}>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text || (msg.role === 'model' && !isLoading ? '...' : '')}</p>
               <span className="text-[10px] opacity-50 mt-2 block">
                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
           </div>
         ))}
-        {isLoading && (
+        {isLoading && !messages[messages.length - 1]?.text && messages[messages.length - 1]?.role === 'model' && (
           <div className="flex justify-start">
             <div className="bg-white/10 rounded-2xl px-5 py-3 border border-white/5">
               <div className="flex space-x-1">
@@ -119,7 +139,7 @@ const ChatView: React.FC = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Type your message here..."
+            placeholder="Ask me anything..."
             className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 pr-16 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all text-sm placeholder-gray-500"
           />
           <button
@@ -128,7 +148,7 @@ const ChatView: React.FC = () => {
             className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-600/20"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           </button>
         </div>
