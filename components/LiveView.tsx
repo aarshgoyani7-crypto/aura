@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Blob } from '@google/genai';
-import { encode, decode, decodeAudioData } from '../utils/audioUtils';
+import { encode, decode, decodeAudioData } from '../utils/audioUtils.ts';
 
 const LiveView: React.FC = () => {
   const [isActive, setIsActive] = useState(false);
@@ -30,7 +30,6 @@ const LiveView: React.FC = () => {
   const startSession = async () => {
     setIsConnecting(true);
     try {
-      // Fix: Always use process.env.API_KEY directly for initialization as per @google/genai guidelines.
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const inputAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -61,7 +60,6 @@ const LiveView: React.FC = () => {
                 mimeType: 'audio/pcm;rate=16000',
               };
               
-              // CRITICAL: Solely rely on sessionPromise resolves and then call `session.sendRealtimeInput`
               sessionPromise.then(session => {
                 session.sendRealtimeInput({ media: pcmBlob });
               });
@@ -71,7 +69,6 @@ const LiveView: React.FC = () => {
             scriptProcessor.connect(inputAudioContext.destination);
           },
           onmessage: async (message: LiveServerMessage) => {
-            // Audio output
             const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
             if (base64Audio && outputAudioContext) {
               nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputAudioContext.currentTime);
@@ -85,14 +82,12 @@ const LiveView: React.FC = () => {
               source.onended = () => sourcesRef.current.delete(source);
             }
 
-            // Interruptions
             if (message.serverContent?.interrupted) {
               sourcesRef.current.forEach(s => s.stop());
               sourcesRef.current.clear();
               nextStartTimeRef.current = 0;
             }
 
-            // Transcriptions
             if (message.serverContent?.inputTranscription) {
               transcriptionRef.current.user += message.serverContent.inputTranscription.text;
             }
@@ -142,7 +137,6 @@ const LiveView: React.FC = () => {
       </div>
 
       <div className="relative flex items-center justify-center">
-        {/* Pulsing Visualizer */}
         {isActive && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-64 h-64 bg-indigo-500/20 rounded-full animate-ping opacity-75"></div>
@@ -190,9 +184,6 @@ const LiveView: React.FC = () => {
                 </p>
               </div>
             ))}
-            {transcriptions.length === 0 && (
-              <p className="text-center text-gray-500 text-sm italic py-8">Start speaking to see transcription...</p>
-            )}
           </div>
         </div>
       )}
