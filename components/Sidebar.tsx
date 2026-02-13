@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AppView } from '../types';
+import { AppView } from '../types.ts';
 
 interface SidebarProps {
   currentView: AppView;
@@ -52,11 +52,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
 
       <div className="mt-auto pt-6 border-t border-white/5 px-2">
         <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-2xl p-4 border border-indigo-500/20">
-          <p className="text-xs text-indigo-300 font-semibold mb-1 uppercase tracking-wider">Pro Access</p>
-          <p className="text-sm text-gray-300">Unlock Veo 3.1 & Imagen 4</p>
-          <button className="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
-            Upgrade
-          </button>
+          <p className="text-xs text-indigo-300 font-semibold mb-1 uppercase tracking-wider">System Status</p>
+          <p className="text-sm text-gray-300">AI Engine Operational</p>
+          <div className="mt-3 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+            <span className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Active</span>
+          </div>
         </div>
       </div>
     </aside>
