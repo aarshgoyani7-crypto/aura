@@ -1,0 +1,8 @@
+{
+  "name": "Aura Creative Studio",
+  "description": "A world-class AI suite powered by Gemini, featuring multimodal chat, high-fidelity image generation, cinematic video creation with Veo, and real-time audio-visual conversations.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
