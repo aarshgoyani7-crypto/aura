@@ -18,7 +18,7 @@ const ChatView: React.FC = () => {
   const handleSend = async () => {
     const apiKey = process.env?.API_KEY;
     if (!apiKey || apiKey === 'undefined' || apiKey.length < 5) {
-      alert("System Error: API Key is inactive. Please use the 'Connect API' button.");
+      alert("System Error: API Key is inactive. Please use the 'Activate Pro' button in the header.");
       return;
     }
 
@@ -69,7 +69,7 @@ const ChatView: React.FC = () => {
       let errorText = 'Aura encountered a connection interrupt. Please verify your API status.';
       
       if (error?.message?.includes('401') || error?.message?.includes('403') || error?.message?.includes('404')) {
-        errorText = 'Your API session has expired. Please re-authenticate using the header button.';
+        errorText = 'Your API session has expired. Please re-activate using the header button.';
       }
 
       setMessages(prev => [...prev, {
@@ -156,16 +156,5 @@ const ChatView: React.FC = () => {
     </div>
   );
 };
-async function sendToGemini(text: string) {
-  const res = await fetch("/api/gemini", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ prompt: text })
-  });
 
-  const data = await res.json();
-  console.log(data);
-}
 export default ChatView;

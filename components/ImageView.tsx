@@ -6,8 +6,6 @@ import { ImageResult } from '../types.ts';
 const ImageView: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState('1:1');
-  const [imageSize, setImageSize] = useState<'1K' | '2K' | '4K'>('1K');
-  const [useSearch, setUseSearch] = useState(true);
   const [results, setResults] = useState<ImageResult[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasKey, setHasKey] = useState(false);
@@ -17,15 +15,23 @@ const ImageView: React.FC = () => {
       if (window.aistudio) {
         const selected = await window.aistudio.hasSelectedApiKey();
         setHasKey(selected);
+      } else {
+        // Fallback for local dev if process.env.API_KEY is present
+        const envKey = process.env.API_KEY;
+        if (envKey && envKey !== 'undefined' && envKey.length > 5) setHasKey(true);
       }
     };
     checkKey();
+    
+    // Set up a listener for key changes (polling as recommended for robustness)
+    const interval = setInterval(checkKey, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleOpenKeyDialog = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      setHasKey(true); // Optimistic proceed
+      setHasKey(true); // Optimistic proceed to avoid race conditions
     }
   };
 
@@ -34,19 +40,17 @@ const ImageView: React.FC = () => {
 
     setIsGenerating(true);
     try {
-      // Create fresh instance to pick up latest selected key
+      // Re-initialize to ensure we use the latest key from process.env.API_KEY
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-image-preview',
+        model: 'gemini-2.5-flash-image',
         contents: {
           parts: [{ text: prompt }],
         },
         config: {
           imageConfig: {
             aspectRatio: aspectRatio as any,
-            imageSize: imageSize,
           },
-          tools: useSearch ? [{ googleSearch: {} }] : [],
         },
       });
 
@@ -65,15 +69,15 @@ const ImageView: React.FC = () => {
       }
 
       if (!foundImage) {
-        alert("Aura couldn't visualize this request. Please adjust the prompt or safety settings.");
+        alert("The model did not return an image. This can happen with very short or restricted prompts.");
       }
     } catch (error: any) {
       console.error('Image generation error:', error);
-      if (error?.message?.includes('Requested entity was not found')) {
+      if (error?.message?.includes('Requested entity was not found') || error?.message?.includes('404')) {
         setHasKey(false);
-        alert('Your API session has expired. Please select a paid API key again.');
+        alert('API session issue detected. Please re-select your API key.');
       } else {
-        alert("Generation Interrupted: " + (error?.message || "Check your network or API status."));
+        alert("Generation Error: " + (error?.message || "Check your connection and API key status."));
       }
     } finally {
       setIsGenerating(false);
@@ -90,9 +94,8 @@ const ImageView: React.FC = () => {
             </svg>
           </div>
           <div className="space-y-3">
-            <h2 className="text-2xl font-bold text-white tracking-tight">Pro Image Studio</h2>
-            <p className="text-gray-400 text-sm leading-relaxed">High-fidelity 4K generation requires a selected API key from a project with billing enabled.</p>
-            <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-indigo-400 text-xs font-bold hover:underline mt-2 inline-block uppercase tracking-widest">Billing Documentation</a>
+            <h2 className="text-2xl font-bold text-white tracking-tight">Flash Image Studio</h2>
+            <p className="text-gray-400 text-sm leading-relaxed">To enable image generation on Vercel, you must connect your Gemini API key.</p>
           </div>
           <button
             onClick={handleOpenKeyDialog}
@@ -110,7 +113,7 @@ const ImageView: React.FC = () => {
       <div className="lg:col-span-1 glass rounded-[2.5rem] p-8 space-y-8 flex flex-col h-full overflow-y-auto border border-white/5">
         <div>
           <h2 className="text-xl font-bold text-white mb-2">Visual Engine</h2>
-          <p className="text-sm text-gray-500">Gemini 3 Pro • High Fidelity</p>
+          <p className="text-sm text-gray-500">Gemini 2.5 Flash • Rapid Visuals</p>
         </div>
 
         <div className="space-y-4">
@@ -118,28 +121,9 @@ const ImageView: React.FC = () => {
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Ethereal cosmic landscape with flowing liquid gold rivers and crystalline structures..."
-            className="w-full h-36 bg-gray-950/50 border border-white/10 rounded-2xl p-5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all text-sm resize-none shadow-inner"
+            placeholder="A surreal floating island with waterfalls flowing into the clouds, digital art style..."
+            className="w-full h-48 bg-gray-950/50 border border-white/10 rounded-2xl p-5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all text-sm resize-none shadow-inner"
           />
-        </div>
-
-        <div className="space-y-4">
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest">Resolution</label>
-          <div className="grid grid-cols-3 gap-2">
-            {['1K', '2K', '4K'].map((size) => (
-              <button
-                key={size}
-                onClick={() => setImageSize(size as any)}
-                className={`py-2.5 rounded-xl text-xs font-bold border transition-all ${
-                  imageSize === size
-                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
-                    : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/20'
-                }`}
-              >
-                {size}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div className="space-y-4">
@@ -151,7 +135,7 @@ const ImageView: React.FC = () => {
                 onClick={() => setAspectRatio(ratio)}
                 className={`py-2.5 rounded-xl text-xs font-bold border transition-all ${
                   aspectRatio === ratio
-                    ? 'bg-white/10 border-white/20 text-white'
+                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
                     : 'bg-white/5 border-white/10 text-gray-500 hover:border-white/20'
                 }`}
               >
@@ -159,19 +143,6 @@ const ImageView: React.FC = () => {
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-          <div className="flex flex-col">
-            <span className="text-xs font-bold text-gray-300">Search Grounding</span>
-            <span className="text-[10px] text-gray-500">Enable real-time context</span>
-          </div>
-          <button 
-            onClick={() => setUseSearch(!useSearch)}
-            className={`w-12 h-6 rounded-full transition-colors relative ${useSearch ? 'bg-indigo-600' : 'bg-gray-700'}`}
-          >
-            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${useSearch ? 'left-7' : 'left-1'}`}></div>
-          </button>
         </div>
 
         <button
@@ -182,14 +153,14 @@ const ImageView: React.FC = () => {
           {isGenerating ? (
             <>
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              Rendering...
+              Processing...
             </>
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              Generate Vision
+              Generate Image
             </>
           )}
         </button>
@@ -200,11 +171,11 @@ const ImageView: React.FC = () => {
           <div className="h-full flex flex-col items-center justify-center text-center p-12 glass rounded-[2.5rem] border-dashed border-2 border-white/10">
             <div className="w-24 h-24 bg-white/[0.02] rounded-[2rem] flex items-center justify-center mb-6 shadow-inner">
               <svg className="w-12 h-12 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <h3 className="text-2xl font-bold text-white mb-2 tracking-tight">Gallery Empty</h3>
-            <p className="text-gray-500 max-w-sm mx-auto">Your high-resolution AI artworks will appear here once generated.</p>
+            <h3 className="text-2xl font-bold text-white mb-2 tracking-tight">Gallery</h3>
+            <p className="text-gray-500 max-w-sm mx-auto">Your generated visual creations will appear here.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -218,26 +189,19 @@ const ImageView: React.FC = () => {
                       onClick={() => {
                         const link = document.createElement('a');
                         link.href = res.url;
-                        link.download = `aura-pro-${Date.now()}.png`;
+                        link.download = `aura-gen-${Date.now()}.png`;
                         link.click();
                       }}
                       className="px-6 py-2.5 bg-white text-black rounded-full text-xs font-bold hover:bg-indigo-50 transition-colors"
                     >
-                      Download 4K
+                      Download
                     </button>
                   </div>
                 </div>
                 <div className="p-5 flex justify-between items-center bg-gray-950/80 backdrop-blur-xl">
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Aura Pro Output</span>
+                    <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Aura Engine</span>
                     <span className="text-[9px] text-gray-600 mt-0.5">{res.timestamp.toLocaleTimeString()}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors text-gray-400">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                      </svg>
-                    </button>
                   </div>
                 </div>
               </div>
