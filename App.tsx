@@ -10,9 +10,15 @@ import { AppView } from './types.ts';
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.CHAT);
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ok' | 'missing'>('checking');
+  const [hasPrivateSecret, setHasPrivateSecret] = useState(false);
 
-  const checkKeyStatus = () => {
-    // Check for the API key in a way that doesn't throw if process is partially defined
+  const checkKeyStatus = async () => {
+    // Check if the user has a selected key (private quota)
+    if (window.aistudio) {
+      const selected = await window.aistudio.hasSelectedApiKey();
+      setHasPrivateSecret(selected);
+    }
+
     const key = typeof process !== 'undefined' && process.env ? process.env.API_KEY : undefined;
     const isValid = key && key !== 'undefined' && key.length > 5;
     setApiKeyStatus(isValid ? 'ok' : 'missing');
@@ -20,8 +26,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     checkKeyStatus();
-    // Poll for key changes
-    const interval = setInterval(checkKeyStatus, 1500);
+    const interval = setInterval(checkKeyStatus, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -29,13 +34,13 @@ const App: React.FC = () => {
     if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
       try {
         await window.aistudio.openSelectKey();
-        // Optimistically proceed to fix race conditions mentioned in guidelines
         setApiKeyStatus('ok');
+        setHasPrivateSecret(true);
       } catch (e) {
         console.error("Failed to open key selection:", e);
       }
     } else {
-      alert("API Key Selection is only available within the Aura environment. Please verify your Vercel deployment settings.");
+      alert("API Key Selection is only available within the Aura environment. Please verify your environment.");
     }
   };
 
@@ -49,84 +54,78 @@ const App: React.FC = () => {
     }
   };
 
-  // Views that handle their own key state (Pro models)
-  const isProView = currentView === AppView.IMAGE || currentView === AppView.VIDEO;
+  // Image and Video views handle their own missing key UI for better user guidance
+  const isSelfManagedView = currentView === AppView.IMAGE || currentView === AppView.VIDEO;
 
   return (
-    <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
-      {/* Visual background accents */}
-      <div className="fixed top-[-10%] left-[-5%] w-[40%] h-[50%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="fixed bottom-[-10%] right-[-5%] w-[40%] h-[50%] bg-purple-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+    <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden selection:bg-indigo-500/30">
+      {/* Dynamic Background */}
+      <div className="fixed top-[-15%] left-[-10%] w-[50%] h-[60%] bg-indigo-600/5 rounded-full blur-[160px] pointer-events-none"></div>
+      <div className="fixed bottom-[-15%] right-[-10%] w-[50%] h-[60%] bg-purple-600/5 rounded-full blur-[160px] pointer-events-none"></div>
 
       <Sidebar currentView={currentView} setView={setCurrentView} />
       
       <main className="flex-1 flex flex-col p-6 lg:p-8 overflow-hidden z-10 relative">
-        <header className="flex justify-between items-center mb-8 px-2">
+        <header className="flex justify-between items-center mb-8 px-4">
           <div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">
-              {currentView === AppView.CHAT && 'Creative Intelligence'}
-              {currentView === AppView.IMAGE && 'Pro Visual Studio'}
-              {currentView === AppView.VIDEO && 'Motion Production'}
-              {currentView === AppView.LIVE && 'Live Interaction'}
+            <h2 className="text-2xl font-black text-white tracking-tight uppercase">
+              {currentView === AppView.CHAT && 'Direct Intelligence'}
+              {currentView === AppView.IMAGE && 'Visual Studio'}
+              {currentView === AppView.VIDEO && 'Veo Motion'}
+              {currentView === AppView.LIVE && 'Live Connect'}
             </h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Aura v1.3</span>
-              <span className="text-gray-800">•</span>
-              <div className="flex items-center gap-1.5">
-                <div className={`w-2 h-2 rounded-full ${apiKeyStatus === 'ok' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 animate-pulse'}`}></div>
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-[9px] text-gray-600 font-black uppercase tracking-[0.2em]">Aura v1.4</span>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/5">
+                <div className={`w-1.5 h-1.5 rounded-full ${apiKeyStatus === 'ok' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 animate-pulse'}`}></div>
+                <span className={`text-[8px] font-black uppercase tracking-widest ${
                   apiKeyStatus === 'ok' ? 'text-emerald-400' : 'text-amber-400'
                 }`}>
-                  {apiKeyStatus === 'ok' ? 'System Online' : 'Pending Activation'}
+                  {apiKeyStatus === 'ok' ? (hasPrivateSecret ? 'Personal Quota' : 'Shared Quota') : 'Activation Pending'}
                 </span>
               </div>
             </div>
           </div>
           
           <div className="flex items-center gap-4">
-            {apiKeyStatus !== 'ok' && (
-              <button 
-                onClick={handleActivateKey}
-                className="px-5 py-2.5 bg-indigo-600/10 border border-indigo-500/30 text-indigo-400 text-xs font-bold rounded-xl hover:bg-indigo-600/20 transition-all flex items-center gap-2 shadow-lg"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-                Activate Pro
-              </button>
-            )}
-            <div className="w-10 h-10 rounded-xl bg-gray-900 border border-white/5 flex items-center justify-center overflow-hidden shadow-2xl ring-1 ring-white/10">
-              <img src="https://api.dicebear.com/7.x/shapes/svg?seed=Aura" alt="Profile" className="w-full h-full object-cover" />
+            <button 
+              onClick={handleActivateKey}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-xl ${
+                hasPrivateSecret 
+                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
+              }`}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+              {hasPrivateSecret ? 'Key Connected' : 'Connect Personal Key'}
+            </button>
+            <div className="w-10 h-10 rounded-2xl bg-gray-900 border border-white/10 flex items-center justify-center overflow-hidden shadow-inner p-1">
+              <img src="https://api.dicebear.com/7.x/bottts-neutral/svg?seed=Aura&backgroundColor=030712" alt="Avatar" className="w-full h-full object-contain" />
             </div>
           </div>
         </header>
 
         <div className="flex-1 min-h-0 overflow-hidden relative">
-          {apiKeyStatus === 'missing' && !isProView ? (
-            <div className="absolute inset-0 z-40 bg-gray-950/40 backdrop-blur-md rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center space-y-8 border border-white/5">
-               <div className="relative">
-                 <div className="w-24 h-24 bg-indigo-600/10 rounded-[2rem] flex items-center justify-center rotate-3 border border-indigo-500/20">
-                    <svg className="w-12 h-12 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                 </div>
-                 <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-purple-600 rounded-full border-4 border-gray-950 flex items-center justify-center">
-                    <span className="text-white font-bold text-xs">!</span>
-                 </div>
+          {apiKeyStatus === 'missing' && !isSelfManagedView ? (
+            <div className="absolute inset-0 z-40 bg-gray-950/60 backdrop-blur-xl rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center space-y-8 border border-white/5">
+               <div className="w-24 h-24 bg-indigo-600/10 rounded-[2.5rem] flex items-center justify-center rotate-6 border border-indigo-500/20 shadow-2xl">
+                  <svg className="w-10 h-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
                </div>
                <div className="space-y-3">
-                <h3 className="text-3xl font-bold text-white tracking-tight">Activate Aura Studio</h3>
-                <p className="text-gray-400 max-w-sm mx-auto leading-relaxed">Connect your Gemini API key to unlock expert-level reasoning and creative generation.</p>
+                <h3 className="text-3xl font-black text-white tracking-tighter uppercase">Activate Aura Intelligence</h3>
+                <p className="text-gray-500 max-w-sm mx-auto text-sm leading-relaxed">Connect your API key to bypass shared rate limits and access expert-level multimodal AI generation.</p>
                </div>
                <button 
                 onClick={handleActivateKey}
-                className="px-10 py-4 bg-white text-gray-950 hover:bg-indigo-50 font-bold rounded-2xl shadow-xl shadow-white/5 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3"
+                className="px-10 py-4 bg-white text-gray-950 hover:bg-indigo-50 font-black uppercase tracking-widest rounded-2xl shadow-2xl transition-all transform hover:scale-105 active:scale-95"
                >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
                 Secure Connection
                </button>
+               <a href="https://ai.google.dev/" target="_blank" className="text-[10px] text-gray-600 font-bold hover:text-indigo-400 transition-colors uppercase tracking-[0.2em]">Get free key at ai.google.dev</a>
             </div>
           ) : renderView()}
         </div>
