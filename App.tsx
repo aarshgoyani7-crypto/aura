@@ -12,7 +12,7 @@ const App: React.FC = () => {
   const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'ok' | 'missing'>('checking');
 
   const checkKeyStatus = () => {
-    // Robustly check for the API key in a way that doesn't throw if process is partially defined
+    // Check for the API key in a way that doesn't throw if process is partially defined
     const key = typeof process !== 'undefined' && process.env ? process.env.API_KEY : undefined;
     const isValid = key && key !== 'undefined' && key.length > 5;
     setApiKeyStatus(isValid ? 'ok' : 'missing');
@@ -20,7 +20,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     checkKeyStatus();
-    // Poll for key changes (important for bridging between the app and key selection dialogs)
+    // Poll for key changes
     const interval = setInterval(checkKeyStatus, 1500);
     return () => clearInterval(interval);
   }, []);
@@ -29,12 +29,13 @@ const App: React.FC = () => {
     if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
       try {
         await window.aistudio.openSelectKey();
-        checkKeyStatus();
+        // Optimistically proceed to fix race conditions mentioned in guidelines
+        setApiKeyStatus('ok');
       } catch (e) {
         console.error("Failed to open key selection:", e);
       }
     } else {
-      alert("API Key Selection is only available within the Aura environment. If you are deployed on Vercel, please set the API_KEY environment variable in your project settings.");
+      alert("API Key Selection is only available within the Aura environment. Please verify your Vercel deployment settings.");
     }
   };
 
@@ -47,6 +48,9 @@ const App: React.FC = () => {
       default: return <ChatView />;
     }
   };
+
+  // Views that handle their own key state (Pro models)
+  const isProView = currentView === AppView.IMAGE || currentView === AppView.VIDEO;
 
   return (
     <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
@@ -61,12 +65,12 @@ const App: React.FC = () => {
           <div>
             <h2 className="text-2xl font-bold text-white tracking-tight">
               {currentView === AppView.CHAT && 'Creative Intelligence'}
-              {currentView === AppView.IMAGE && 'Visual Studio'}
+              {currentView === AppView.IMAGE && 'Pro Visual Studio'}
               {currentView === AppView.VIDEO && 'Motion Production'}
               {currentView === AppView.LIVE && 'Live Interaction'}
             </h2>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Aura v1.2</span>
+              <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Aura v1.3</span>
               <span className="text-gray-800">•</span>
               <div className="flex items-center gap-1.5">
                 <div className={`w-2 h-2 rounded-full ${apiKeyStatus === 'ok' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 animate-pulse'}`}></div>
@@ -88,7 +92,7 @@ const App: React.FC = () => {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                 </svg>
-                Connect API
+                Activate Pro
               </button>
             )}
             <div className="w-10 h-10 rounded-xl bg-gray-900 border border-white/5 flex items-center justify-center overflow-hidden shadow-2xl ring-1 ring-white/10">
@@ -98,7 +102,7 @@ const App: React.FC = () => {
         </header>
 
         <div className="flex-1 min-h-0 overflow-hidden relative">
-          {apiKeyStatus === 'missing' && currentView !== AppView.VIDEO ? (
+          {apiKeyStatus === 'missing' && !isProView ? (
             <div className="absolute inset-0 z-40 bg-gray-950/40 backdrop-blur-md rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center space-y-8 border border-white/5">
                <div className="relative">
                  <div className="w-24 h-24 bg-indigo-600/10 rounded-[2rem] flex items-center justify-center rotate-3 border border-indigo-500/20">
@@ -112,7 +116,7 @@ const App: React.FC = () => {
                </div>
                <div className="space-y-3">
                 <h3 className="text-3xl font-bold text-white tracking-tight">Activate Aura Studio</h3>
-                <p className="text-gray-400 max-w-sm mx-auto leading-relaxed">Your creative workspace is ready. Connect your Gemini API key to unlock world-class generation and reasoning.</p>
+                <p className="text-gray-400 max-w-sm mx-auto leading-relaxed">Connect your Gemini API key to unlock expert-level reasoning and creative generation.</p>
                </div>
                <button 
                 onClick={handleActivateKey}
@@ -123,7 +127,6 @@ const App: React.FC = () => {
                 </svg>
                 Secure Connection
                </button>
-               <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold">Encrypted End-to-End Session</p>
             </div>
           ) : renderView()}
         </div>
